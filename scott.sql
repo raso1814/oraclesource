@@ -1405,3 +1405,296 @@ FROM
            left outer join salgrade on e1.sal BETWEEN s.losal AND s.hisal
            left outer join emp  e2 on e1.mgr = e2.empno
 order by d.deptno, e1.ename; 
+
+-- 서브쿼리 : sql문을 실행하는 데 필요한 데이터를 추가로 조회하기 위해  
+-- sql문 내부에서 사용하는 select문을 말함
+-- 연산자와 같은 비교 또는 조회 대상이 오른쪽에 놓여서 괄호로 묶어서 사용
+-- 서브쿼리의 SELECT 절에 명시한 열은 메인쿼리의 
+-- 비교대상과 같은 자료형과 같은 개수로 지칭
+
+
+--Jones 사원의 급여보다 높은 급여를 받는 사원 조회
+--Jones 사원의 급여 조회
+SELECT SAL FROM EMP WHERE ENAME = 'JONES';  --2975
+--2975보다 큰 사원 조회
+SELECT *FROM EMP WHERE SAL > 2975;
+
+--단일행 서브쿼리
+--서브쿼리의 결과가 단 하나의 행으로 나온 상황
+-->,>=,=<=,<>,^=,!=
+SELECT *FROM EMP WHERE SAL > 
+(SELECT SAL FROM EMP WHERE ENAME = 'JONES'); 
+
+--ALLEN 사원의 추가 수당보다 많은 추가수당을 받는 사원 조회
+SELECT * FROM EMP WHERE COMM > 
+(SELECT COMM FROM EMP WHERE ENAME = 'ALLEN');
+
+--WARD 사원의 입사일보다 빨리 입사한 사원 목록 조회
+SELECT * FROM EMP WHERE HIREDATE 
+< (SELECT HIREDATE FROM EMP WHERE ENAME = 'WARD');
+
+-- 20번 부서에 속한 사원 중 전체 사원의 평균 급여보다 높은 급여를 받는 사원정보
+--(사원번호, 사원명, 직업, 급여)와 소속부서정보(부서번호, 부서명, 부서위치)를 조회
+SELECT EMPNO, ENAME, JOB, SAL, D.DEPTNO,ENAME, LOC
+FROM EMP E, DEPT D
+WHERE E.DEPTNO=D.DEPTNO AND D.DEPTNO=20 
+AND E.SAL > (SELECT AVG(SAL) FROM EMP);
+
+--다중행 서브쿼리
+--서브쿼리 실행결과가 여러개로 나오는 걸 의미
+--IN : 메인 쿼리의 데이터가 서브쿼리의 결과 중 하나라도 일치하면 TRUE
+--ANY(SOME): 메인 쿼리의 조건식을 만족하는 서브쿼리의 결과가 하나 이상이면 TRUE
+--ALL: 메인쿼리의 조건식을 서브쿼리의 결과 모두가 만족하면 TRUE
+--EXISTS : 서브 쿼리의 결과가 존재하면(행 1개 이상 존재하면) TRUE
+
+--부서별 최고급여와 같은 사원 조회
+SELECT * FROM EMP WHERE SAL IN
+(SELECT MAX(SAL) FROM EMP GROUP BY DEPTNO);
+
+-- ANY(SOME)
+SELECT * FROM EMP WHERE SAL = ANY
+(SELECT MAX(SAL) FROM EMP GROUP BY DEPTNO);
+
+--30번 부서 사원들의 최고급여보다 적은 사원 조회
+SELECT * FROM EMP WHERE SAL < 
+ANY(SELECT SAL FROM EMP WHERE DEPTNO=30); --MAX쓸 필요없음
+
+--30번 부서 사원들의 최저급여보다 많은 사원 조회
+SELECT * FROM EMP WHERE SAL >
+ANY(SELECT SAL FROM EMP WHERE DEPTNO=30); -- MIN쓸 필요없음
+
+--ALL
+--30번 부서 사원들의 급여보다 적은 사원 조회
+SELECT*FROM EMP WHERE SAL < 
+ALL (SELECT SAL FROM EMP WHERE DEPTNO=30);
+
+--30번 부서 사원들의 급여보다 큰 사원 조회
+SELECT*FROM EMP WHERE SAL > 
+ALL (SELECT SAL FROM EMP WHERE DEPTNO=30);
+
+--EXISTS
+SELECT * FROM EMP WHERE EXISTS 
+(SELECT DNAME FROM DEPT WHERE DEPTNO=10);
+
+SELECT * FROM EMP WHERE EXISTS 
+(SELECT DNAME FROM DEPT WHERE DEPTNO=50);
+
+--문제] 전체 사원 중 ALLEN과 같은 직책인 사원들의 사원정보, 부서정보 출력하기
+SELECT ENAME, EMPNO, JOB, SAL, D.DEPTNO, DNAME 
+FROM EMP E, DEPT D
+WHERE E.DEPTNO = D.DEPTNO
+AND E.JOB IN (SELECT JOB FROM EMP WHERE ENAME = 'ALLEN');
+
+-- 전체 사원의 평균 급여보다 높은 급여를 받는 사원들의 사원정보, 부서정보, 급여등급
+--출력하기(급여가 많은 순으로 정렬하되 급여가 같은 경우에는 사원번호 오름차순으로 정렬)
+SELECT * FROM 
+EMP E, DEPT D, SALGRADE S
+WHERE E.DEPTNO = D.DEPTNO AND E.SAL BETWEEN S.LOSAL AND S.HISAL
+AND E.SAL > (SELECT AVG(SAL) FROM EMP)
+ORDER BY E.SAL DESC, E.EMPNO ASC;
+
+-- 비교할 열이 여러개인 다중열 서브쿼리
+SELECT * FROM EMP WHERE (DEPTNO, SAL) 
+IN (SELECT DEPTNO, MAX(SAL) FROM EMP GROUP BY DEPTNO);
+
+--FROM 서브쿼리 (인라인 뷰)
+SELECT EMPNO, ENAME, D.DEPTNO, DNAME, LOC
+FROM (SELECT*FROM EMP WHERE DEPTNO=10) E10,
+(SELECT*FROM DEPT) D
+WHERE E10.DEPTNO = D.DEPTNO;
+
+--INSERT 사용하는 서브쿼리
+--VALUES 절은 사용하지 않음
+--데이터가 추가되는 테이블의 열 개수와 서브쿼리의 열 개수가 일치해야 한다.
+--데이터가 추가되는 테이블의 자료형과 서브쿼리의 자료형이 일치해야 한다.
+--EMP 테이블에서 SALGRADE 테이블을 참조하여 급여 등급이 1인 사원만을 EMP_TEMP
+--에 추가하기
+
+INSERT INTO EMP_TEMP(EMPNO,ENAME,JOB,MGR,HIREDATE,SAL,COMM,DEPTNO)
+SELECT E.EMPNO,E.ENAME,E.JOB,E.MGR,E.HIREDATE,E.SAL,E.COMM,E.DEPTNO
+FROM EMP E, SALGRADE S
+WHERE E.SAL BETWEEN S.LOSAL AND S.HISAL
+AND S.GRADE=1;
+
+--UPDATE 서브쿼리
+SELECT *FROM DEPT_TEMP;
+
+--40번 부서의 부서 이름과 지역 수정(DEPT 테이블의 DEPTNO=30인 지역명, 부서명추출)
+UPDATE DEPT_TEMP SET (DNAME, LOC) =
+(SELECT DNAME, LOC FROM DEPT WHERE DEPTNO=30)
+WHERE DEPTNO=40;
+
+UPDATE DEPT_TEMP SET LOC = 'SEOUL'
+WHERE DEPTNO = (SELECT DEPTNO FROM DEPT WHERE DNAME = 'ACCOUNTING');
+
+--DELETE 서브쿼리
+DELETE DEPT_TEMP; 
+
+--급여 등급이 3등급이고 30번 부서인 사원들만 삭제
+
+DELETE EMP_TEMP
+WHERE EMPNO IN 
+(SELECT EMPNO FROM
+EMP_TEMP E, SALGRADE S 
+WHERE E.SAL BETWEEN S.LOSAL AND S.HISAL
+AND E.DEPTNO =30 AND S.GRADE =3);
+
+CREATE TABLE EXAM_EMP AS SELECT*FROM EMP;
+CREATE TABLE EXAM_DEPT AS SELECT*FROM DEPT;
+CREATE TABLE EXAM_SALGRADE AS SELECT*FROM SALGRADE;
+
+INSERT INTO EXAM_EMP VALUES
+(7201, 'TEST_USER1','MANAGER',7788,'2016-01-02',4500,NULL,50);
+INSERT INTO EXAM_EMP VALUES
+(7202, 'TEST_USER2','CLERK',7201,'2016-02-21',1800,NULL,50);
+INSERT INTO EXAM_EMP VALUES
+(7203, 'TEST_USER3','ANALYST',7201,'2016-04-11',3400,NULL,60);
+INSERT INTO EXAM_EMP VALUES
+(7204, 'TEST_USER4','SALESMAN',7201,'2016-05-31',2700,300,60);
+INSERT INTO EXAM_EMP VALUES
+(7205, 'TEST_USER5','CLERK',7201,'2016-07-20',2600,NULL,70);
+INSERT INTO EXAM_EMP VALUES
+(7206, 'TEST_USER6','CLERK',7201,'2016-09-08',2600,NULL,70);
+INSERT INTO EXAM_EMP VALUES
+(7207, 'TEST_USER7','LECTURER',7201,'2016-10-28',2300,NULL,80);
+INSERT INTO EXAM_EMP VALUES
+(7208, 'TEST_USER8','STUDENT',7201,'2018-03-09',1200,NULL,80);
+
+--[실습3] EXAM_EMP에 속한 사원 중 50번 부서에서 근무하는 사원들의 평균 급여보다 많은 급여를 받고 있는 사원들을 70번 부서로 옮기는 SQL 문 작성하기
+UPDATE EXAM_EMP SET DEPTNO = 70
+WHERE SAL > 
+(SELECT AVG(SAL) FROM EXAM_EMP WHERE DEPTNO=50);
+
+--[실습4] EXAM_EMP에 속한 사원 중 60번 부서의 사원 중에서 입사일이 가장 빠른 사원보다 늦게 입사한 사원의 급여를 10% 인상하고 80번 부서로 옮기는 SQL 문 작성하기
+UPDATE EXAM_EMP SET SAL = SAL*1.1, DEPTNO=80
+WHERE HIREDATE > ANY
+(SELECT HIREDATE FROM EXAM_EMP WHERE DEPTNO =60);
+
+--[실습5] EXAM_EMP에 속한 사원 중, 급여 등급이 5인 사원을 삭제하는 SQL문을 작성하기
+DELETE EXAM_EMP 
+WHERE EMPNO IN
+(SELECT EMPNO
+FROM EXAM_EMP E, EXAM_SALGRADE S
+WHERE E.SAL BETWEEN S.LOSAL AND S.HISAL AND GRADE = 5);
+
+--트랜젝션 하나의 단위로 데이터를 처리
+CREATE TABLE DEPT_TCL AS SELECT*FROM DEPT;
+SELECT*FROM DEPT_TCL;
+
+--트랜젝션과 관련있는 명령어 실행
+INSERT INTO DEPT_TCL VALUES(50,'DATABASE','SEOUL');
+UPDATE DEPT_TCL SET LOC = 'BUSAN' WHERE DEPTNO = 40;
+DELETE FROM DEPT_TCL WHERE DNAME='RESEARCH';
+SELECT*FROM DEPT_TCL;
+
+-----------------
+--수행된 명령 취소 
+ROLLBACK;
+
+--수행된 명령 최종반영
+COMMIT;
+
+--세션 : 어떤 활동을 위한 시간이나 기간
+-- 데이터베이스 접속을 시작으로 여러 데이터베이스에서 관련 작업을 수행한 후
+-- 접속을 종료하기까지 전체 기간
+
+delete dept_tcl where deptno = 50;
+select*from dept_tcl;
+commit;
+
+update dept_tcl set loc = 'seoul' where deptno=30;
+COMMIT;
+
+--DDL(데이터 정의어)
+--객체를 생성, 변경, 삭제
+--실행하면 반영됨
+--create(생성), alter(변경), drop(삭제)
+
+-- create table 테이블이름(
+--             필드명1 자료형, 필드명2 자료형,
+-- )
+
+-- 테이블 이름 규칙
+-- 문자로 시작
+-- 같은 사용자 안에서 동일한 테이블명 사용불가
+-- sql 키워드는 테이블 이름으로 사용할 수 없음
+
+--필드명 생성 규칙
+-- 문자로 시작
+-- 열 이름은 중복되면 안됨
+-- sql 키워드 사용불가
+
+-- 자료형 : 숫자 NUMBER, 문자 VARCHAR2, 날짜 DATE
+
+CREATE TABLE EMP_DDL(
+EMPNO NUMBER(4), --숫자로 4자리 허용
+ENAME VARCHAR2(10),
+JOB VARCHAR2(9),
+MGR NUMBER(4),
+HIREDATE DATE,
+SAL NUMBER(7,2), -- 숫자로 7자리 허용(소수점 2자리 허용)
+COMM NUMBER(7,2),
+DEPTNO NUMBER(2)
+);
+
+DESC EMP_DDL;
+
+DROP TABLE EMP_DDL;
+
+CREATE TABLE DEPT_DDL AS SELECT * FROM DEPT;
+CREATE TABLE DEPT_DDL_30 AS SELECT * FROM DEPT
+WHERE DEPTNO=30;
+
+SELECT*FROM DEPT_DDL_30;
+
+CREATE TABLE DEPT_DDL2 AS SELECT*FROM DEPT WHERE 1<>1;
+SELECT * FROM DEPT_DDL2;
+
+--ALTER
+--이미 생성된 객체를 변경 
+
+CREATE TABLE EMP_ALTER AS SELECT*FROM EMP;
+
+--새로운 컬럼(열) 추가 : ADD
+DESC EMP_ALTER;
+
+ALTER TABLE EMP_ALTER ADD HP VARCHAR2(20);
+SELECT * FROM EMP_ALTER;
+
+--RENAME: 열 이름을 변경
+ALTER TABLE EMP_ALTER RENAME COLUMN HP TO TEL;
+
+--MODIFY : 열의 자료형을 변경
+ALTER TABLE EMP_ALTER MODIFY EMPNO NUMBER(5);
+
+--DROP 열삭제
+ALTER TABLE EMP_ALTER DROP COLUMN TEL;
+
+--테이블 이름 변경 
+RENAME EMP_ALTER TO EMP_RENAME;
+
+DESC EMP_RENAME;
+
+-- 테이블 데이터를 삭제 TRUNCATE
+SELECT * FROM EMP_RENAME;
+TRUNCATE TABLE EMP_RENAME;
+
+CREATE TABLE MEMBER(
+ID CHAR(8),
+NAME VARCHAR(10),
+ADDR VARCHAR2(50),
+NATION CHAR(4),
+EMAIL VARCHAR2(50),
+AGE NUMBER(7,2)
+);
+
+ALTER TABLE MEMBER MODIFY NAME VARCHAR2(10); 
+ALTER TABLE MEMBER ADD BIGO VARCHAR2(20);
+
+SELECT*FROM MEMBER;
+
+ALTER TABLE MEMBER MODIFY BIGO VARCHAR2(30);
+DESC MEMBER;
+
+ALTER TABLE MEMBER RENAME COLUMN BIGO TO REMARK;
+
